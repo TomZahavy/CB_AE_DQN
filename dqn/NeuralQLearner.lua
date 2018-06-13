@@ -46,6 +46,7 @@ function nql:__init(args)
     if self.shallow_elimination_flag ==1 then
       self.lambda = args.lambda or 0.1
       self.beta       = args.elimination_beta or 10
+      self.active_beta = self.beta
       self.n_features = self.AEN_n_filters*3 --account for bias
       self.elimination_freq = args.elimination_freq or 50000
       self.A = torch.CudaTensor(self.n_objects,self.n_features,self.n_features)
@@ -853,6 +854,7 @@ function nql:elimination_update()
   local replay_obj_index_table ,_=  self.transitions:getObjIndexTable()
 
   local i = 0
+  self.active_beta = self.beta*torch.log(#replay_obj_index_table)/torch.log(self.replay_memory)
   while i < #replay_obj_index_table  do
     i=i+1
     local replay_ind = replay_obj_index_table[i]
@@ -897,7 +899,7 @@ function nql:shallow_elimination(state,testing)
   local phi = self.obj_target_network.modules[3].output:transpose(1,2)
   --local start_t = sys.clock()
   phi = phi:reshape(1,(#phi)[1],1):expand(self.n_objects,(#phi)[1],1):cuda()
-  local conf = torch.sqrt(torch.abs(self.beta*torch.bmm(phi:transpose(2,3),torch.bmm(self.A,phi)))):squeeze()
+  local conf = torch.sqrt(torch.abs(self.active_beta*torch.bmm(phi:transpose(2,3),torch.bmm(self.A,phi)))):squeeze()
   if testing then
     self.val_conf_buf[1][eval_step]=prediction:gt(self.object_restrict_thresh):mean() -- avg AEN eliminations
     self.val_conf_buf[2][eval_step]=torch.add(prediction,-conf):gt(self.object_restrict_thresh):mean() -- avg hard eliminations with confidence
