@@ -27,7 +27,9 @@ return function(args)
   net_s:add(net_concat)
   net_s:add(nn.Reshape(tot_filters_s))
   net_s:add(nn.Linear(tot_filters_s,output_size,false))
-  net_s:add(nn.Sigmoid())
+  if args.shallow_elimination_flag ==0 then
+    net_s:add(nn.Sigmoid())
+  end
 
   print("AEN:\n", net_s)
   return net_s

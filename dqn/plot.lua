@@ -75,7 +75,7 @@ function plotExpFromTable(table,ylabel,legend_pos,figure_title,fig_num,png)
   if png ~= nil then
     plt.pngfigure(png)
   else
-    plt.figure(fig_num)
+    plt.figure(1)
   end
   if figure_title then plt.title(figure_title) end
   plt.xlabel('Steps 10k')

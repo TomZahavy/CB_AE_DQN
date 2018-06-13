@@ -18,22 +18,24 @@ replay_memory=1000000
 eval_freq=10000                 # can change ratio between steps and eval_freq to get more samples
 eval_steps=2000
 prog_freq=10000
-save_freq=100000
-update_freq=100
+save_freq=30000
+
+
+update_freq=20 #100?
 n_replay=4
 obj_start=1
 #operation modes
 bad_parse_penalty_scale=0      #apply penalty multiplier for bad commands
 shallow_exploration_flag=0
-shallow_elimination_flag=0
+shallow_elimination_flag=1
 double_elimination=1           #use AE predictions to mask invalid actions Q value of the target network
 
-el_beta=1
-let elimination_freq=$eval_freq*20
+el_beta=0.01 #0.05
+let elimination_freq=$eval_freq*3
 
 obj_bad_cmd_thresh=0.6          #when sigmoid output is larger then the threshold consider it as bad prediction
 obj_acc_trust_thresh=0.75       #accuracy threshold for agent to use object net insight
-obj_drop_prob=0.9               #probability to drop actions which Obj net condsiders as bad for explore mod
+obj_drop_prob=0.7               #probability to drop actions which Obj net condsiders as bad for explore mod
 AEN_sample_bias=0.3             #used to increse the number of successful parse samples in AEN buffers
 parse_lable_scale=0.001         #from TF guide: A coefficient to use on the positive labels, value < 1 decreases the false positive count and increases the precision.
 
@@ -43,10 +45,9 @@ min_reward=-1
 discount=0.8
 if [ $scenario -gt 4 ]; then
   obj_drop_prob=0.5
-  obj_bad_cmd_thresh=0.6
   obj_sample=20
   obj_max=100
-  obj_start=4
+
   cp dqn/1200_sorted_actions.txt dqn/action_strings.txt
   if [ $scenario == 5 ]; then # troll file
     learn_start=200000
@@ -59,14 +60,11 @@ if [ $scenario -gt 4 ]; then
           max_reward=20
           min_reward=0
   elif [ $scenario == 7 ]; then
-    obj_bad_cmd_thresh=0.6
-    obj_drop_prob=0.9
     obj_sample=20
     obj_max=100
     learn_start=100000
     eps_endt=500000
     steps=2000000
-    n_replay=10
   fi
 elif [ $scenario == 4 ]; then # troll 200 take
   obj_sample=5                  #[0,n_objects] how many objects to sample
@@ -74,20 +72,18 @@ elif [ $scenario == 4 ]; then # troll 200 take
   learn_start=100000
      eps_endt=500000
         steps=5000000
-else
-  update_freq=20
+else #egg
   if [ $scenario == 3 ]; then # egg 200 take
     obj_sample=2
     obj_max=5
     learn_start=100000
     eps_endt=200000
-    steps=2000000
+    steps=500000
   else # 1 egg 5 take 2: egg 30 take
-    replay_memory=500000
     obj_sample=1
     obj_max=2
     steps=500000
-    learn_start=100000
+    learn_start=30000
     eps_endt=200000
   fi
 fi

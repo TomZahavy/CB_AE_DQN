@@ -7,6 +7,7 @@ See LICENSE file for full terms of limited license.
 if not dqn then
     require "initenv"
 end
+require 'plot'
 
 local cmd = torch.CmdLine()
 cmd:text()
@@ -69,6 +70,13 @@ local v_history = {}
 local qmax_history = {}
 local td_history = {}
 local reward_history = {}
+local bad_action_history = {}
+ShallowEliminationBuff = {}
+EliminationBuff = {}
+ShallowEliminationFPBuff = {}
+EliminationFPBuff = {}
+LossBuff = {}
+AccBuff = {}
 local obj_loss_history = {}
 local step = 0
 time_history[1] = 0
@@ -82,13 +90,11 @@ print("Iteration ..", step)
 local win = nil
 local agent_o, filename
 local logfile=io.open(opt.name .. '_log.txt', 'w')
+logfile:write('Start')
+logfile:close()
 while step < opt.steps do
     step = step + 1
     local action_index,a_o = agent:perceive(reward, screen, terminal)
-    --print ("@DEBUG: train_agent action index is",action_index)
-    --print ("@DEBUG: train_agent game actions is",table.unpack(game_actions))
-    --print ("@DEBUG: train_agent game_actions[action_index] is",game_actions[action_index])
-    -- game over? get next game!
     if not terminal then
         screen, reward, terminal,new_state_string , bad_command = game_env:step(game_actions[action_index], true)
         agent.lastAction_bad = bad_command -- give agent feedback for last command validity
@@ -135,19 +141,24 @@ while step < opt.steps do
             local action_index,a_o = agent:perceive(reward, screen, terminal, true, 0.05) -- a_o : object for action assume only 1 for now
             -- Play game in test mode (episodes don't end when losing a life)
             local prev_string, prev_inventory = game_env:getCurrentStringState()
+
             screen, reward, terminal,new_state_string,bad_command = game_env:step(game_actions[action_index])
             episode_reward = episode_reward + reward
-            if nepisodes <= opt.eval_samples and step >= opt.steps/2 then
-              if estep == 1 then 
+            if nepisodes <= opt.eval_samples then
+              if estep == 1 then
+                logfile=io.open(opt.name .. '_log.txt', 'a')
                 logfile:write('@@@@@@@@ eval sample start after '.. (step-agent.learn_start)/opt.eval_freq .. ' learning iterations @@@@@@@@\n')
               end
-              logfile:write(prev_string .. '\n'.. prev_inventory .. '\n')
+              logfile:write(prev_string .. prev_inventory)
               logfile:write(game_actions[action_index].action .. '\n')
+              logfile:write('reward: ' .. reward ..  ', bad_command: ' .. bad_command .. '\n'..'\n')
+
               if terminal then
                 logfile:write(new_state_string .. '\n')
                 logfile:write('$$$$ end of trace  with reward '..episode_reward..' $$$$\n')
-                if nepisodes == opt.eval_samples then 
+                if nepisodes == opt.eval_samples then
                   logfile:write('#### end of eval period ####\n')
+                  logfile:close()
                 end
               end
             end
@@ -176,16 +187,14 @@ while step < opt.steps do
             buff[{{},1 }],buff[{{},2 }],buff[{{},3 }],buff[{{},4 }] = agent.val_conf_buf:mean(2):float():squeeze(),
               agent.val_conf_buf:std(2):float():squeeze(),agent.val_conf_buf:min(2):float():squeeze()
               ,agent.val_conf_buf:max(2):float():squeeze()
-            print('avg,std,min,max/AEN_prediction,shallow_predictions,confidence_values_avg,confidence_std')
+            print('cols: avg,std,min,max/ rows: AEN_prediction,shallow_predictions,confidence_values_avg,confidence_std')
             print(buff)
-            --print('std',agent.val_conf_buf:std(2))
-            --print('min',agent.val_conf_buf:min(2),'max',agent.val_conf_buf:max(2))
         end
 
       eval_time = sys.clock() - eval_time
       start_time = start_time + eval_time
-	  local ind = #reward_history+1
-	  obj_loss_history[ind] = agent:compute_validation_statistics() -- update loss for obj network
+	    local ind = #reward_history+1
+	    obj_loss_history[ind] = agent:compute_validation_statistics(ind) -- update loss for obj network
       total_reward = total_reward/math.max(1, nepisodes)
 
       if #reward_history == 0 or total_reward > torch.Tensor(reward_history):max() then
@@ -198,11 +207,11 @@ while step < opt.steps do
           qmax_history[ind] = agent.q_max
       end
       print("V", v_history[ind], "TD error", td_history[ind], "Qmax", qmax_history[ind])
-      print("bad commands issued on objects during eval", eval_bad_command/eval_tot_obj_actions)
+      eval_bad_command = eval_bad_command/eval_tot_obj_actions
       reward_history[ind] = total_reward
 	    reward_counts[ind] = nrewards
       episode_counts[ind] = nepisodes
-
+      bad_action_history[ind] = eval_bad_command
       time_history[ind+1] = sys.clock() - start_time
 
       local time_dif = time_history[ind+1] - time_history[ind]
@@ -212,10 +221,10 @@ while step < opt.steps do
       print(string.format(
           '\nSteps: %d (frames: %d), reward: %.2f, epsilon: %.2f, lr: %G, ' ..
           'training time: %ds, training rate: %dfps, testing time: %ds, ' ..
-          'testing rate: %dfps,  num. ep.: %d,  num. rewards: %d',
+          'testing rate: %dfps,  num. ep.: %d,  num. rewards: %d, num. bad_actions %.3f',
           step, step*opt.actrep, total_reward, agent.ep, agent.lr, time_dif,
           training_rate, eval_time, opt.actrep*opt.eval_steps/eval_time,
-          nepisodes, nrewards))
+          nepisodes, nrewards,eval_bad_command  ))
     end
 
     if step % opt.save_freq == 0 or step == opt.steps then
@@ -238,6 +247,13 @@ while step < opt.steps do
                             model_AEN = agent.obj_network,
                             best_model = agent.best_network,
                             reward_history = reward_history,
+                            bad_action_history = bad_action_history,
+                            ShallowEliminationBuff = ShallowEliminationBuff,
+                            EliminationBuff = EliminationBuff,
+                            ShallowEliminationFPBuff = ShallowEliminationFPBuff,
+                            EliminationFPBuff = EliminationFPBuff,
+                            LossBuff = LossBuff,
+                            AccBuff = AccBuff,
                             obj_loss_history = obj_loss_history,
                             reward_counts = reward_counts,
                             episode_counts = episode_counts,
@@ -248,6 +264,39 @@ while step < opt.steps do
                             arguments=opt
                         }
         torch.save(filename ..".t7", agent_o)
+        if step > learn_start then
+          --plotAgentFromSummary(summarizeAgent(filename,nil,agent_o))
+            legend_pos = legend_pos or {'right','bottom'}
+            local DQN_reward = torch.Tensor(agent_o.reward_history)
+            plt.figure(1)
+            plt.title('reward')
+            plt.xlabel('Steps 10k')
+            plt.movelegend(unpack(legend_pos))
+            plt.plot({DQN_reward})
+            gnuplot.plotflush()
+
+            --[[plt.figure(2)
+            gnuplot.raw('set multiplot layout 3,1')
+            local bad_command = torch.Tensor(agent_o.bad_action_history)
+            local ShallowEliminationBuff = torch.Tensor(agent_o.ShallowEliminationBuff)
+            local EliminationBuff = torch.Tensor(agent_o.EliminationBuff)
+            local ShallowEliminationFPBuff = torch.Tensor(agent_o.ShallowEliminationFPBuff)
+            local EliminationFPBuff = torch.Tensor(agent_o.EliminationFPBuff)
+            local LossBuff = torch.Tensor(agent_o.LossBuff)
+            local AccBuff = torch.Tensor(agent_o.AccBuff)
+
+            gnuplot.raw("set title 'bad_command,loss,accuracy'")
+            plt.plot({'bad commands',bad_command},{'loss',LossBuff},{'acc',AccBuff})
+
+            gnuplot.raw("set title 'Elimination'")
+            plt.plot({'Shallow Elimination',ShallowEliminationBuff},{'Elimination',EliminationBuff})
+
+            gnuplot.raw("set title 'FalsePositives'")
+            plt.plot({'Shallow Elimination FP',ShallowEliminationFPBuff},{'Elimination FP',EliminationFPBuff})
+
+            gnuplot.plotflush()--]]
+        end
+
         if opt.saveNetworkParams then
             local nets = {network=w:clone():float()}
             torch.save(filename..'.params.t7', nets, 'ascii')
@@ -261,6 +310,4 @@ while step < opt.steps do
         collectgarbage()
     end
   end
-logfile:close()
-require 'plot'
 plotAgentFromSummary(summarizeAgent(filename,nil,agent_o))

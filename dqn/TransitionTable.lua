@@ -144,8 +144,7 @@ function trans:fill_buffer()
 
             local s, a,r,s2,t,a_o,bad_command, index
             repeat
-                if torch.uniform() < self.AEN_sample_bias then 	--bias samples to favor at least 1% good actions
-                    --prioritize good take actions to amend rep bias
+                if torch.uniform() < self.AEN_sample_bias then 	--prioritize good take actions to amend rep bias
                     index = self.good_take_action_index[torch.random(#self.good_take_action_index)]
                 else
                     --sample any take action
@@ -154,7 +153,6 @@ function trans:fill_buffer()
             until self:isActionIndexSafeToGet(index)-- for state concatination
 
             s, a, r, s2 ,t, a_o, bad_command = self:getByActionIndex(index) -- sample from the transition table
-            --print ("total object action sampled",#self.take_action_index)
             assert(a_o ~= 0) --here we should not have none object action
 
             self.buf_s_for_obj[buf_ind]:copy(s)
@@ -187,9 +185,7 @@ function trans:fill_buffer()
 end
 
 function trans:report(verbose)
-    print("action table size " .. self.numEntries)
-    print("general take actions " .. #self.take_action_index)
-    print("good take actions " .. #self.good_take_action_index)
+    print("Total actions:  " .. self.numEntries .. " Take actions: " .. #self.take_action_index .. " Valid take actions: " .. #self.good_take_action_index)
     if verbose > 1 then
       print("replay action histogram: {good parse/action samples}\n", self.action_histogram) --[{ {},{1,30} }])
     end
