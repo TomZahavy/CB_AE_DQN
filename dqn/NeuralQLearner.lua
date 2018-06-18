@@ -841,8 +841,8 @@ function nql:elimination_update()
   self.obj_target_network    =  self.obj_network:clone()
   self.obj_target_network:remove()
   self.obj_target_network:evaluate()
-  local PHI = torch.CudaTensor(n_actions,n_features):zero()
-  local THETA = torch.CudaTensor(n_actions,n_features):zero()
+  local PHI = torch.CudaTensor(self.n_objects,self.n_features):zero()
+  local THETA = torch.CudaTensor(self.n_objects,self.n_features):zero()
 
   --local A_Mat = torch.CudaTensor(self.n_objects,self.n_features,self.n_features)
   --A_Mat:copy(torch.eye(n_features):mul(lambda):reshape(1,n_features,n_features):expand(n_actions,n_features,n_features))
@@ -855,6 +855,8 @@ function nql:elimination_update()
   self.active_beta = self.beta*torch.log(#replay_obj_index_table)/torch.log(self.replay_memory)
   local ss_buff = torch.CudaTensor(self.minibatch_size,self.input_dims[1],self.input_dims[2],self.input_dims[3])
   local aa_buff = torch.Tensor(self.minibatch_size)
+  local ee_buff = torch.Tensor(self.minibatch_size)
+
   while i < #replay_obj_index_table  do
     i=i+1
     local replay_ind = replay_obj_index_table[i]
@@ -873,7 +875,7 @@ function nql:elimination_update()
       j=1
       local phi_buff = self.obj_target_network:forward(ss_buff)
       for t=1,self.minibatch_size do
-          PHI[aa_buff[t]]:add(phi:mul(ee_buff[t]))
+          PHI[aa_buff[t]]:add(phi_buff[t]:mul(ee_buff[t]))
           self.A[aa_buff[t]]:add(torch.mm(phi_buff:narrow(1,t,1):transpose(1,2),phi_buff:narrow(1,t,1)))--,phi:transpose(1,2)))
       end
     end
@@ -888,13 +890,13 @@ function nql:elimination_update()
   end
 
 
-  for i = 1, n_actions do
+  for i = 1,self.n_objects do
     THETA[i]:copy(torch.mv(self.A[i],PHI[i]))
   end
 
 
   self.obj_target_network    =  self.obj_network:clone()
-  self.obj_target_network.modules[no_activation_network_size].weight:copy(THETA:transpose(1,2))
+  self.obj_target_network.modules[self.obj_target_network:size()].weight:copy(THETA:transpose(1,2))
 
   self.obj_target_network:evaluate()
   if self.verbose > 1 then print ("shallow update took: " .. sys.clock()-start_t) end
