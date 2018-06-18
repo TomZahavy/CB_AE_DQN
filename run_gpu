@@ -21,7 +21,7 @@ prog_freq=10000
 save_freq=30000
 
 
-update_freq=1000
+update_freq=1
 n_replay=1
 obj_start=1
 #operation modes
