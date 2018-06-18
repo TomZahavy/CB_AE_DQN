@@ -43,6 +43,11 @@ function nql:__init(args)
     self.AEN_n_filters = args.AEN_n_filters or 20
     self.shallow_exploration_flag = args.shallow_exploration_flag or 0
     self.shallow_elimination_flag = args.shallow_elimination_flag or 0
+    if self.agent_tweak == VANILA then
+      self.shallow_elimination_flag =0
+      self.shallow_exploration_flag =0
+      self.double_elimination =0
+    end
     if self.shallow_elimination_flag ==1 then
       self.lambda = args.lambda or 0.1
       self.beta       = args.elimination_beta or 10
@@ -842,7 +847,6 @@ function nql:elimination_update()
   self.obj_target_network:remove()
   self.obj_target_network:evaluate()
   local PHI = torch.CudaTensor(self.n_objects,self.n_features):zero()
-  local THETA = torch.CudaTensor(self.n_objects,self.n_features):zero()
 
   --local A_Mat = torch.CudaTensor(self.n_objects,self.n_features,self.n_features)
   --A_Mat:copy(torch.eye(n_features):mul(lambda):reshape(1,n_features,n_features):expand(n_actions,n_features,n_features))
@@ -888,14 +892,14 @@ function nql:elimination_update()
   end
 
   PHI = PHI:reshape(self.n_objects,self.n_features,1)
-  THETA = torch.bmm(self.A,PHI)
-  --for i = 1,self.n_objects do     THETA[i]:copy(torch.mv(self.A[i],PHI[i]))   end
-
+  local THETA = torch.bmm(self.A,PHI)
 
   self.obj_target_network    =  self.obj_network:clone()
   self.obj_target_network.modules[self.obj_target_network:size()].weight:copy(THETA)
-
   self.obj_target_network:evaluate()
+
+  --self.obj_network    =  self.obj_target_network:clone()
+
   if self.verbose > 1 then print ("shallow update took: " .. sys.clock()-start_t) end
 end
 
