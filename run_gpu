@@ -21,7 +21,7 @@ prog_freq=10000
 save_freq=30000
 
 
-update_freq=1
+update_freq=1000
 n_replay=1
 obj_start=1
 #operation modes
@@ -75,7 +75,7 @@ elif [ $scenario == 4 ]; then # troll 200 take
         steps=5000000
 else #egg
 
-  update_freq=20
+  #update_freq=20
   if [ $scenario == 3 ]; then # egg 200 take
     obj_sample=2
     obj_max=5

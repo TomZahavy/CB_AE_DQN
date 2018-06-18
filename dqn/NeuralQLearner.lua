@@ -875,12 +875,10 @@ function nql:elimination_update()
       j=1
       local phi_buff = self.obj_target_network:forward(ss_buff)
       for t=1,self.minibatch_size do
-          PHI[aa_buff[t]]:add(phi_buff[t]:mul(ee_buff[t]))
-          self.A[aa_buff[t]]:add(torch.mm(phi_buff:narrow(1,t,1):transpose(1,2),phi_buff:narrow(1,t,1)))--,phi:transpose(1,2)))
+        if ee_buff[t]==1 then PHI[aa_buff[t]]:add(phi_buff[t]) end
+        self.A[aa_buff[t]]:add(torch.mm(phi_buff:narrow(1,t,1):transpose(1,2),phi_buff:narrow(1,t,1)))--,phi:transpose(1,2)))
       end
     end
-
-
   end
 
   local A_Mat = torch.FloatTensor(self.n_objects,self.n_features,self.n_features)
@@ -889,14 +887,13 @@ function nql:elimination_update()
     self.A[i]:copy(torch.inverse(A_Mat[i]))
   end
 
-
-  for i = 1,self.n_objects do
-    THETA[i]:copy(torch.mv(self.A[i],PHI[i]))
-  end
+  PHI = PHI:reshape(self.n_objects,self.n_features,1)
+  THETA = torch.bmm(self.A,PHI)
+  --for i = 1,self.n_objects do     THETA[i]:copy(torch.mv(self.A[i],PHI[i]))   end
 
 
   self.obj_target_network    =  self.obj_network:clone()
-  self.obj_target_network.modules[self.obj_target_network:size()].weight:copy(THETA:transpose(1,2))
+  self.obj_target_network.modules[self.obj_target_network:size()].weight:copy(THETA)
 
   self.obj_target_network:evaluate()
   if self.verbose > 1 then print ("shallow update took: " .. sys.clock()-start_t) end
