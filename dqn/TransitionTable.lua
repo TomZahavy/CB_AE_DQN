@@ -187,7 +187,7 @@ end
 function trans:report(verbose)
     print("Total actions:  " .. self.numEntries .. " Take actions: " .. #self.take_action_index .. " Valid take actions: " .. #self.good_take_action_index)
     if verbose > 1 then
-      print("replay action histogram: {good parse/action samples}\n", self.action_histogram) --[{ {},{1,30} }])
+      print("replay action histogram: {good parse/action samples}\n", self.action_histogram:narrow(2,1,30)) --[{ {},{1,30} }])
     end
 end
 

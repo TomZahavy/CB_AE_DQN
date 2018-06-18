@@ -21,8 +21,8 @@ prog_freq=10000
 save_freq=30000
 
 
-update_freq=20 #100?
-n_replay=4
+update_freq=1
+n_replay=1
 obj_start=1
 #operation modes
 bad_parse_penalty_scale=0      #apply penalty multiplier for bad commands
@@ -30,8 +30,8 @@ shallow_exploration_flag=0
 shallow_elimination_flag=1
 double_elimination=1           #use AE predictions to mask invalid actions Q value of the target network
 
-el_beta=0.01 #0.05
-let elimination_freq=$eval_freq*3
+el_beta=1 #0.05
+let elimination_freq=$eval_freq*5
 
 obj_bad_cmd_thresh=0.6          #when sigmoid output is larger then the threshold consider it as bad prediction
 obj_acc_trust_thresh=0.75       #accuracy threshold for agent to use object net insight
@@ -47,16 +47,17 @@ if [ $scenario -gt 4 ]; then
   obj_drop_prob=0.5
   obj_sample=20
   obj_max=100
+  cp dqn/131_actions.txt dqn/action_strings.txt
 
-  cp dqn/1200_sorted_actions.txt dqn/action_strings.txt
+  #cp dqn/1200_sorted_actions.txt dqn/action_strings.txt
   if [ $scenario == 5 ]; then # troll file
     learn_start=200000
        eps_endt=500000
           steps=5000000
   elif [ $scenario == 6 ]; then # open file
-    learn_start=200000
-       eps_endt=9000000
-          steps=20000000
+    learn_start=50000
+       eps_endt=1000000
+          steps=2000000
           max_reward=20
           min_reward=0
   elif [ $scenario == 7 ]; then
@@ -73,6 +74,8 @@ elif [ $scenario == 4 ]; then # troll 200 take
      eps_endt=500000
         steps=5000000
 else #egg
+
+  update_freq=20
   if [ $scenario == 3 ]; then # egg 200 take
     obj_sample=2
     obj_max=5

@@ -183,11 +183,11 @@ while step < opt.steps do
         end
         if step > agent.obj_start and agent.shallow_elimination_flag == 1 then
             --local buff = agent.val_conf_buf
-            local buff = torch.FloatTensor(4,4):zero()
+            local buff = torch.FloatTensor(5,4):zero()
             buff[{{},1 }],buff[{{},2 }],buff[{{},3 }],buff[{{},4 }] = agent.val_conf_buf:mean(2):float():squeeze(),
               agent.val_conf_buf:std(2):float():squeeze(),agent.val_conf_buf:min(2):float():squeeze()
               ,agent.val_conf_buf:max(2):float():squeeze()
-            print('cols: avg,std,min,max/ rows: AEN_prediction,shallow_predictions,confidence_values_avg,confidence_std')
+            print('cols: avg,std,min,max (over min)/ rows: AEN_prediction,shallow_predictions,confidence_values_avg,confidence_min, conf max (over actions)')
             print(buff)
         end
 
