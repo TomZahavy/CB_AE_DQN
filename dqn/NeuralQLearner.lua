@@ -43,6 +43,18 @@ function nql:__init(args)
     self.AEN_n_filters = args.AEN_n_filters or 20
     self.shallow_exploration_flag = args.shallow_exploration_flag or 0
     self.shallow_elimination_flag = args.shallow_elimination_flag or 0
+    if args.agent_tweak:match("greedy") then -- tweak option for large action space
+        self.agent_tweak  = GREEDY
+        print("greedy restriction tweak")
+    elseif args.agent_tweak:match("explore") then
+        self.agent_tweak  = EXPLORE
+        print("exploration restriction tweak")
+    elseif args.agent_tweak:match("merged") then
+        self.agent_tweak  = MERGED
+        print("greedy and exploration restriction tweak")
+    else self.agent_tweak  = VANILA --vanilla
+        print("vanila algo")
+    end
     if self.agent_tweak == VANILA then
       self.shallow_elimination_flag =0
       self.shallow_exploration_flag =0
@@ -63,18 +75,6 @@ function nql:__init(args)
     self.objects_range=torch.range(1,self.n_objects):cudaInt()
     self.actions_range=torch.range(1,self.n_actions):cudaInt()
 
-    if args.agent_tweak:match("greedy") then -- tweak option for large action space
-        self.agent_tweak  = GREEDY
-        print("greedy restriction tweak")
-    elseif args.agent_tweak:match("explore") then
-        self.agent_tweak  = EXPLORE
-        print("exploration restriction tweak")
-    elseif args.agent_tweak:match("merged") then
-        self.agent_tweak  = MERGED
-        print("greedy and exploration restriction tweak")
-    else self.agent_tweak  = VANILA --vanilla
-        print("vanila algo")
-    end
     --assert( self.obj_max+self.obj_sample > 0 or self.agent_tweak == VANILLA or self.agent_tweak == EXPLORE)
     self.sigmoid = cudnn.Sigmoid():cuda()
     self.softmax = cudnn.SoftMax():cuda()
@@ -898,7 +898,7 @@ function nql:elimination_update()
   self.obj_target_network.modules[self.obj_target_network:size()].weight:copy(THETA)
   self.obj_target_network:evaluate()
 
-  --self.obj_network    =  self.obj_target_network:clone()
+  self.obj_network    =  self.obj_target_network:clone()
 
   if self.verbose > 1 then print ("shallow update took: " .. sys.clock()-start_t) end
 end
