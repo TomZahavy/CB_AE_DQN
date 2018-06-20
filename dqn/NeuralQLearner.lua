@@ -66,9 +66,9 @@ function nql:__init(args)
       self.active_beta = self.beta
       self.n_features = self.AEN_n_filters*3 --account for bias
       self.elimination_freq = args.elimination_freq or 50000
-      self.A = torch.CudaTensor(self.n_objects,self.n_features,self.n_features)
-      self.A_init = torch.CudaTensor(self.n_objects,self.n_features,self.n_features)
-      self.A_init:copy(torch.eye(self.n_features):mul(self.lambda):reshape(1,self.n_features,self.n_features):expand(self.n_objects,self.n_features,self.n_features))
+      self.A = torch.CudaTensor(self.n_objects,self.n_features+1,self.n_features+1)
+      self.A_init = torch.CudaTensor(self.n_objects,self.n_features+1,self.n_features+1)
+      self.A_init:copy(torch.eye(self.n_features+1):mul(self.lambda):reshape(1,self.n_features+1,self.n_features+1):expand(self.n_objects,self.n_features+1,self.n_features+1))
       self.val_conf_buf = torch.CudaTensor(5,EVAL_STEPS)
     end
 
@@ -173,7 +173,7 @@ function nql:__init(args)
         else
           self.objNetLoss = nn.BCECriterion(torch.FloatTensor(self.n_objects):fill(self.parse_lable_scale))
         end
-        self.optimState = {learningRate = self.obj_lr, learningRateDecay = 0.0005}--, nesterov = true, momentum = 0.8, dampening = 0} -- for obj network
+        self.optimState = {learningRate = self.obj_lr}--, nesterov = true, momentum = 0.8, dampening = 0} -- for obj network
         self.last_object_net_accuracy = 0
         if self.gpu and self.gpu >= 0 then
             self.obj_network:cuda()
@@ -511,9 +511,12 @@ function nql:compute_validation_statistics(ind)
 
     if self.agent_tweak ~= VANILA then -- calc object net validation info
       local h_x = self.obj_target_network:forward(self.valid_s_for_obj)
-      local J
+      local J=0
       if self.shallow_elimination_flag == 1 then
-        J = self.objNetLoss:forward(h_x, self.valid_Y_buff)
+        for i=1,self.valid_size do
+            J=J+torch.abs(h_x[i][self.valid_a_o[i]]-self.valid_Y_buff[i][self.valid_a_o[i]])
+        end
+        J=J/self.valid_size
       else
         J = self.objNetLoss:forward(h_x, self.valid_Y_buff)/self.parse_lable_scale
       end
@@ -674,7 +677,9 @@ function nql:eGreedy(state, testing,testing_ep)
       if self.shallow_elimination_flag == 1 then
           --return 2 tensors: AE target net work prediction and confidence
           prediction = self.obj_target_network:forward(state):squeeze()
-          local phi = self.obj_target_network.modules[3].output
+          local phi = torch.CudaTensor(1,self.n_features+1)
+          phi:narrow(2,1,self.n_features):copy(self.obj_target_network.modules[3].output)
+          phi:narrow(2,self.n_features+1,1):fill(1)
           uncertainty_bias = self:shallow_elimination(testing,prediction,phi)
           prediction = prediction-uncertainty_bias
       else
@@ -822,7 +827,9 @@ function nql:batchAdaptiveElimination(s)
   local batch_size=s:size()[1]
   local uncertainty_bias =torch.CudaTensor(batch_size,self.n_objects)
   local AEN_prediction = self.obj_target_network:forward(s)
-  local phi = self.obj_target_network.modules[3].output
+  local phi = torch.CudaTensor(batch_size,self.n_features+1)
+  phi:narrow(2,1,self.n_features):copy(self.obj_target_network.modules[3].output)
+  phi:narrow(2,self.n_features+1,1):fill(1)
   for i=1,batch_size do --for each sample in batch
     local conf = nil
     conf = self:shallow_elimination(false, AEN_prediction[i],phi[i])
@@ -846,10 +853,9 @@ function nql:elimination_update()
   self.obj_target_network    =  self.obj_network:clone()
   self.obj_target_network:remove()
   self.obj_target_network:evaluate()
-  local PHI = torch.CudaTensor(self.n_objects,self.n_features):zero()
+  local PHI = torch.CudaTensor(self.n_objects,self.n_features+1):zero()
 
-  --local A_Mat = torch.CudaTensor(self.n_objects,self.n_features,self.n_features)
-  --A_Mat:copy(torch.eye(n_features):mul(lambda):reshape(1,n_features,n_features):expand(n_actions,n_features,n_features))
+
 
   self.A:copy(self.A_init)
   local replay_obj_index_table ,_=  self.transitions:getObjIndexTable()
@@ -877,7 +883,9 @@ function nql:elimination_update()
     end
     if j==(self.minibatch_size+1) then
       j=1
-      local phi_buff = self.obj_target_network:forward(ss_buff)
+      local phi_buff =  torch.CudaTensor(self.minibatch_size,self.n_features+1)
+      phi_buff:narrow(2,1,self.n_features):copy(self.obj_target_network:forward(ss_buff))
+      phi_buff:narrow(2,self.n_features+1,1):fill(1)
       for t=1,self.minibatch_size do
         if ee_buff[t]==1 then PHI[aa_buff[t]]:add(phi_buff[t]) end
         self.A[aa_buff[t]]:add(torch.mm(phi_buff:narrow(1,t,1):transpose(1,2),phi_buff:narrow(1,t,1)))--,phi:transpose(1,2)))
@@ -885,17 +893,22 @@ function nql:elimination_update()
     end
   end
 
-  local A_Mat = torch.FloatTensor(self.n_objects,self.n_features,self.n_features)
+  local A_Mat = torch.FloatTensor(self.n_objects,self.n_features+1,self.n_features+1)
   A_Mat:copy(self.A)
   for i = 1, self.A:size()[1] do
     self.A[i]:copy(torch.inverse(A_Mat[i]))
   end
 
-  PHI = PHI:reshape(self.n_objects,self.n_features,1)
-  local THETA = torch.bmm(self.A,PHI)
+  PHI = PHI:reshape(self.n_objects,self.n_features+1,1)
+  local THETA = torch.bmm(self.A,PHI):squeeze()
+  local weights = ((THETA:narrow(2,1,self.n_features)):reshape(self.n_objects,self.n_features))
+  local biases  = ((THETA:narrow(2,self.n_features+1,1)):reshape(self.n_objects))
+
 
   self.obj_target_network    =  self.obj_network:clone()
-  self.obj_target_network.modules[self.obj_target_network:size()].weight:copy(THETA)
+  self.obj_target_network.modules[self.obj_target_network:size()].weight:copy(weights)
+  self.obj_target_network.modules[self.obj_target_network:size()].bias:copy(biases)
+
   self.obj_target_network:evaluate()
 
   self.obj_network    =  self.obj_target_network:clone()
@@ -907,7 +920,7 @@ end
 function nql:shallow_elimination(testing,prediction,phi)
   --local start_t = sys.clock()
   --local start_t = sys.clock()
-  phi = phi:reshape(1,self.n_features,1):expand(self.n_objects,self.n_features,1)
+  phi = phi:reshape(1,self.n_features+1,1):expand(self.n_objects,self.n_features+1,1)
 
   local conf = torch.sqrt(torch.abs(self.active_beta*torch.bmm(phi:transpose(2,3),torch.bmm(self.A,phi)))):squeeze()
   if testing then

@@ -13,13 +13,14 @@ agent="NeuralQLearner"
 netfile="conv_Q_net"            #DQN arch file
 obj_net_file="conv_AEN"         #AEN arch file
 eval_samples=3                 #number of eval sample steps to save in log (starts to collect)
-AEN_n_filters=20
+AEN_n_filters=30
 replay_memory=1000000
 eval_freq=10000                 # can change ratio between steps and eval_freq to get more samples
 eval_steps=2000
 prog_freq=10000
 save_freq=30000
 
+debug=1
 
 update_freq=1
 n_replay=1
@@ -36,7 +37,7 @@ let elimination_freq=$eval_freq*5
 obj_bad_cmd_thresh=0.6          #when sigmoid output is larger then the threshold consider it as bad prediction
 obj_acc_trust_thresh=0.75       #accuracy threshold for agent to use object net insight
 obj_drop_prob=0.7               #probability to drop actions which Obj net condsiders as bad for explore mod
-AEN_sample_bias=0.3             #used to increse the number of successful parse samples in AEN buffers
+AEN_sample_bias=0.5             #used to increse the number of successful parse samples in AEN buffers
 parse_lable_scale=0.001         #from TF guide: A coefficient to use on the positive labels, value < 1 decreases the false positive count and increases the precision.
 
 replay_memory=1000000
@@ -90,6 +91,16 @@ else #egg
     eps_endt=200000
   fi
 fi
+
+
+if [ 0 ]; then #debug
+  update_freq=100
+  learn_start=30000
+  eval_freq=5000
+  elimination_freq=10000
+  prog_freq=100000
+  save_freq=100000
+fi
 let obj_start=$eval_freq*$obj_start+$learn_start
 eps_end=0.05
 
@@ -129,6 +140,8 @@ if [ $bad_parse_penalty_scale -gt 0 ]; then
 fi
 env_params="bad_parse_penalty_scale="$bad_parse_penalty_scale",game_scenario="$scenario""
 game_path=$PWD"/dqn/zork"
+
+
 
 actrep=1
 random_starts=0
