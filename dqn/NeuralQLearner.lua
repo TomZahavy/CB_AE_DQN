@@ -856,7 +856,7 @@ function nql:elimination_update()
   local PHI = torch.CudaTensor(self.n_objects,self.n_features+1):zero()
 
 
-
+  pos_factor = (#self.transitions.take_action_index-#self.transitions.good_take_action_index+1)/(#self.transitions.good_take_action_index+1)
   self.A:copy(self.A_init)
   local replay_obj_index_table ,_=  self.transitions:getObjIndexTable()
 
@@ -887,7 +887,11 @@ function nql:elimination_update()
       phi_buff:narrow(2,1,self.n_features):copy(self.obj_target_network:forward(ss_buff))
       phi_buff:narrow(2,self.n_features+1,1):fill(1)
       for t=1,self.minibatch_size do
-        if ee_buff[t]==1 then PHI[aa_buff[t]]:add(phi_buff[t]) end
+        if ee_buff[t]==1 then -- bad action
+          PHI[aa_buff[t]]:add(phi_buff[t])
+        else -- good action
+          phi_buff[t]:mul(pos_factor)
+        end
         self.A[aa_buff[t]]:add(torch.mm(phi_buff:narrow(1,t,1):transpose(1,2),phi_buff:narrow(1,t,1)))--,phi:transpose(1,2)))
       end
     end
@@ -919,18 +923,14 @@ end
 
 function nql:shallow_elimination(testing,prediction,phi)
   --local start_t = sys.clock()
-  --local start_t = sys.clock()
   phi = phi:reshape(1,self.n_features+1,1):expand(self.n_objects,self.n_features+1,1)
-
   local conf = torch.sqrt(torch.abs(self.active_beta*torch.bmm(phi:transpose(2,3),torch.bmm(self.A,phi)))):squeeze()
   if testing then
-    --print(torch.bmm(phi:transpose(2,3),torch.bmm(self.A,phi)):squeeze())
     self.val_conf_buf[1][eval_step]=prediction:mean() -- avg AEN eliminations
     self.val_conf_buf[2][eval_step]=torch.add(prediction,-conf):mean() -- avg hard eliminations with confidence
     self.val_conf_buf[3][eval_step]=conf:mean()
     self.val_conf_buf[4][eval_step]=conf:min()
     self.val_conf_buf[5][eval_step]=conf:max()
-
   end
   return conf-- self.sigmoid:forward(conf):mul(0.5):squeeze()
 end
