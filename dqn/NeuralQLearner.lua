@@ -856,7 +856,7 @@ function nql:elimination_update()
   local PHI = torch.CudaTensor(self.n_objects,self.n_features+1):zero()
 
 
-  pos_factor = (#self.transitions.take_action_index-#self.transitions.good_take_action_index+1)/(#self.transitions.good_take_action_index+1)
+  --pos_factor = (#self.transitions.take_action_index-#self.transitions.good_take_action_index+1)/(#self.transitions.good_take_action_index+1)
   self.A:copy(self.A_init)
   local replay_obj_index_table ,_=  self.transitions:getObjIndexTable()
 
@@ -890,6 +890,7 @@ function nql:elimination_update()
         if ee_buff[t]==1 then -- bad action
           PHI[aa_buff[t]]:add(phi_buff[t])
         else -- good action
+          local pos_factor = (self.transitions.action_histogram[2][aa_buff[t]] - self.transitions.action_histogram[1][aa_buff[t]] +1)/(self.transitions.action_histogram[1][aa_buff[t]] +1)
           phi_buff[t]:mul(pos_factor)
         end
         self.A[aa_buff[t]]:add(torch.mm(phi_buff:narrow(1,t,1):transpose(1,2),phi_buff:narrow(1,t,1)))--,phi:transpose(1,2)))

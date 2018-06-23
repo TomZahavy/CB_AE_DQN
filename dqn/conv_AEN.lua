@@ -20,7 +20,7 @@ return function(args)
     local net = nn.Sequential()
     net:add(nn.SpatialConvolution(4,n_filters,in_col,region_hight[i]))
     net:add(nn.ReLU())
-    net:add(nn.SpatialDropout(0.5))
+    --net:add(nn.SpatialDropout(0.5))
     net:add(nn.SpatialMaxPooling(1,in_row_s-region_hight[i]+1))
     net_concat:add(net)
   end

@@ -13,7 +13,7 @@ agent="NeuralQLearner"
 netfile="conv_Q_net"            #DQN arch file
 obj_net_file="conv_AEN"         #AEN arch file
 eval_samples=3                 #number of eval sample steps to save in log (starts to collect)
-AEN_n_filters=30
+AEN_n_filters=100
 replay_memory=1000000
 eval_freq=10000                 # can change ratio between steps and eval_freq to get more samples
 eval_steps=2000
@@ -31,7 +31,7 @@ shallow_exploration_flag=0
 shallow_elimination_flag=1
 double_elimination=1           #use AE predictions to mask invalid actions Q value of the target network
 
-el_beta=1 #0.05
+el_beta=2 #0.05
 let elimination_freq=$eval_freq*5
 
 obj_bad_cmd_thresh=0.6          #when sigmoid output is larger then the threshold consider it as bad prediction
@@ -39,7 +39,7 @@ obj_acc_trust_thresh=0.75       #accuracy threshold for agent to use object net 
 obj_drop_prob=0.7               #probability to drop actions which Obj net condsiders as bad for explore mod
 AEN_sample_bias=0.5             #used to increse the number of successful parse samples in AEN buffers
 parse_lable_scale=0.001         #from TF guide: A coefficient to use on the positive labels, value < 1 decreases the false positive count and increases the precision.
-
+learn_start=50000
 replay_memory=1000000
 max_reward=99
 min_reward=-1
@@ -47,15 +47,12 @@ discount=0.8
 if [ $scenario -gt 4 ]; then
   obj_sample=20
   obj_max=100
-  cp dqn/131_actions.txt dqn/action_strings.txt
-
+  cp dqn/131_actions.txt dqn/action_strings.txts
   #cp dqn/1200_sorted_actions.txt dqn/action_strings.txt
   if [ $scenario == 5 ]; then # troll file
-    learn_start=200000
        eps_endt=500000
           steps=5000000
   elif [ $scenario == 6 ]; then # open file
-    learn_start=50000
        eps_endt=1000000
           steps=2000000
           max_reward=20
@@ -63,34 +60,25 @@ if [ $scenario -gt 4 ]; then
   elif [ $scenario == 7 ]; then
     obj_sample=20
     obj_max=100
-    learn_start=100000
+
     eps_endt=500000
     steps=2000000
   fi
 elif [ $scenario == 4 ]; then # troll 200 take
   obj_sample=5                  #[0,n_objects] how many objects to sample
   obj_max=10                    #[0,n_objects] how many most likely objects to consider with greedy action wp 1
-  learn_start=100000
      eps_endt=500000
         steps=5000000
 else #egg
-
-  #update_freq=20
   if [ $scenario == 3 ]; then # egg 200 take
-    obj_drop_prob=0.9
-    obj_start=4
     obj_sample=2
     obj_max=5
-    learn_start=100000
     eps_endt=200000
     steps=500000
-  else # 1 egg 5 take 2: egg 30 take
-    obj_drop_prob=0.9
-    obj_start=4
+  else
     obj_sample=1
     obj_max=2
     steps=500000
-    learn_start=30000
     eps_endt=200000
   fi
 fi
