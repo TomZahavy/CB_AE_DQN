@@ -890,8 +890,8 @@ function nql:elimination_update()
         if ee_buff[t]==1 then -- bad action
           PHI[aa_buff[t]]:add(phi_buff[t])
         else -- good action
-          local pos_factor = (self.transitions.action_histogram[2][aa_buff[t]] - self.transitions.action_histogram[1][aa_buff[t]] +1)/(self.transitions.action_histogram[1][aa_buff[t]] +1)
-          phi_buff[t]:mul(pos_factor)
+          local pos_factor=(self.transitions.action_histogram[2][aa_buff[t]] - self.transitions.action_histogram[1][aa_buff[t]])/self.transitions.action_histogram[1][aa_buff[t]]
+          if pos_factor>1 then phi_buff[t]:mul(pos_factor) end -- if an action is more pos than neg, we are less interested in sub-sampling it
         end
         self.A[aa_buff[t]]:add(torch.mm(phi_buff:narrow(1,t,1):transpose(1,2),phi_buff:narrow(1,t,1)))--,phi:transpose(1,2)))
       end

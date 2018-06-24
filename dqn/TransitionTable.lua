@@ -381,21 +381,14 @@ function trans:add(s, a, r, term, a_o,bad_command)
     -- Always insert at next index, then wrap around
     self.insertIndex = self.insertIndex + 1
     -- Overwrite oldest experience once at capacity
-    if self.insertIndex > self.maxSize then
-        self.insertIndex = 1
-    end
+    if self.insertIndex > self.maxSize then self.insertIndex = 1 end
     if self.numEntries == self.maxSize then
-        if self.insertIndex  == self.take_action_index[1] then
-        --[[once table is full this ensures the action index list doesnt point to tuples which
-            have been removed due to the index wrap around]]
-            table.remove(self.take_action_index,1)
-        end
-	    if self.insertIndex  == self.good_take_action_index[1] then
-            table.remove(self.good_take_action_index,1)
-        end
+        local evicted_action_index = self.a[self.insertIndex]
+        -- fifo for saving action indices, once the ER is full, removes from the pos/neg action buffers
+        if self.insertIndex  == self.take_action_index[1] then table.remove(self.take_action_index,1) end
+	      if self.insertIndex  == self.good_take_action_index[1] then table.remove(self.good_take_action_index,1) end
         --remove retired action from histograms:
         --good action counter decrease
-        local evicted_action_index = self.a[self.insertIndex]
         self.action_histogram[1][evicted_action_index] = self.action_histogram[1][evicted_action_index] - (1 - self.bad_command[self.insertIndex])
         --played action counter (in replay memory) decrease
         self.action_histogram[2][evicted_action_index] = self.action_histogram[2][evicted_action_index] - 1
